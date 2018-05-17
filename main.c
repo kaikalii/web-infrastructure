@@ -30,7 +30,7 @@ int main() {
 		i_res = getaddrinfo(NULL, BROWSER_PORT, &hints, &result);
 		if (i_res != 0) {
 		    printf("getaddrinfo failed: %d\n", i_res);
-		    WSACleanup();
+		    // WSACleanup();
 		    return 1;
 		}
 		// Create a SOCKET for the server to listen for client connections
@@ -38,7 +38,7 @@ int main() {
 		if (listener == INVALID_SOCKET) {
 		    printf("Error at socket(): %ld\n", WSAGetLastError());
 		    freeaddrinfo(result);
-		    WSACleanup();
+		    // WSACleanup();
 		    return 1;
 		}
 		// Setup the TCP listening socket
@@ -47,7 +47,7 @@ int main() {
 	        printf("bind failed with error: %d\n", WSAGetLastError());
 	        freeaddrinfo(result);
 	        closesocket(listener);
-	        WSACleanup();
+	        // WSACleanup();
 	        return 1;
 	    }
 		freeaddrinfo(result);
@@ -56,7 +56,7 @@ int main() {
 	if (listen(listener, SOMAXCONN) == SOCKET_ERROR) {
 	    printf( "Listen failed with error: %ld\n", WSAGetLastError());
 	    closesocket(listener);
-	    WSACleanup();
+	    // WSACleanup();
 	    return 1;
 	}
 	// Setup browser socket
@@ -68,7 +68,7 @@ int main() {
 	if (browser_socket == INVALID_SOCKET) {
 	    printf("accept failed: %d\n", WSAGetLastError());
 	    closesocket(listener);
-	    WSACleanup();
+	    // WSACleanup();
 	    return 1;
 	}
 	u_long one = 1;
@@ -83,6 +83,7 @@ int main() {
 		char request[1000000];
 		int reqlen = 0;
 		// get the request
+		printf("Waiting for a request from the browser...\n");
 		do {
 		    i_res = recv(browser_socket, data, datalen, 0);
 		    if (i_res > 0) {
@@ -94,16 +95,16 @@ int main() {
 		    else {
 		        printf("request recv failed: %d\n", WSAGetLastError());
 		        closesocket(browser_socket);
-		        WSACleanup();
-		        return 1;
+		        // WSACleanup();
+		        // return 1;
 		    }
-		} while(i_res > 0);
-		printf("Request:\n%s", request);
+		} while(i_res == datalen);
+		printf("\nRequest:\n%s", request);
 
 		// determine the host name
 		char host[300];
 		int i;
-		for(i = 0; i < datalen - 5; i++) {
+		for(i = 0; i < reqlen - 5; i++) {
 			if(data[i] == 'H' && data[i+1] == 'o' && data[i+2] == 's' && data[i+3] == 't' && data[i+4] == ':') break;
 		}
 		i += 6;
@@ -143,8 +144,8 @@ int main() {
 			if (out_socket == INVALID_SOCKET) {
 				printf("Error at socket(): %ld\n", WSAGetLastError());
 				freeaddrinfo(result);
-				WSACleanup();
-				return 1;
+				// WSACleanup();
+				// return 1;
 			} else {
 				printf("socket setup\n");
 				// Connect to server
@@ -162,44 +163,47 @@ int main() {
 
 				if (out_socket == INVALID_SOCKET) {
 					printf("Unable to connect to server!\n");
-					WSACleanup();
-					return 1;
+					// WSACleanup();
+					// return 1;
 				}
 
 				// forward the request
 				i_res = send(out_socket, request, reqlen, 0);
 				if (i_res == SOCKET_ERROR) {
 					printf("Unable to forward request!\n");
-					WSACleanup();
-					return 1;
+					// WSACleanup();
+					// return 1;
 				}
 				// get the response
 				else {
 					printf("request forwarded\n");
-					char response[1000000];
-					int resplen = 0;
+					char response[1000000] = "HTTP/1.0 200\r\n\r\n";
+					int resplen = strlen(response);
 
-					i_res = recv(out_socket, data, datalen, 0);
-					if (i_res > 0) {
-						printf("Bytes received: %d\n", i_res);
-						int i;
-						for(i = 0; i < i_res; i++) response[resplen + i] = data[i];
-						resplen += i_res;
-					} else if (i_res == 0) printf("Connection closing...\n");
-					else {
-						printf("response recv failed: %d\n", WSAGetLastError());
-						closesocket(out_socket);
-						WSACleanup();
-						return 1;
-					}
-					printf("Response:\n%s", response);
+					printf("Waiting for a response from the server...\n");
+					do {
+						i_res = recv(out_socket, data, datalen, 0);
+						if (i_res > 0) {
+							printf("Bytes received: %d\n", i_res);
+							int i;
+							for(i = 0; i < i_res; i++) response[resplen + i] = data[i];
+							resplen += i_res;
+						} else if (i_res == 0) printf("Connection closing...\n");
+						else {
+							printf("response recv failed: %d\n", WSAGetLastError());
+							closesocket(out_socket);
+							// WSACleanup();
+							// return 1;
+						}
+					} while(i_res == datalen);
+					printf("\nResponse:\n%s\n", response);
 
 					// forward the response
 					i_res = send(browser_socket, response, resplen, 0);
 					if (i_res == SOCKET_ERROR) {
 						printf("Unable to forward response!\n");
-						WSACleanup();
-						return 1;
+						// WSACleanup();
+						// return 1;
 					} else printf("response forwarded\n");
 				}
 			}
