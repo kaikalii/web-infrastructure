@@ -4,7 +4,7 @@
 
 #define BROWSER_PORT "53011"
 #define OUT_PORT "53012"
-#define DEFAULT_BUFLEN 1000000
+#define DEFAULT_BUFLEN 1000
 
 int main() {
 	WSADATA wsaData;
@@ -80,21 +80,25 @@ int main() {
 
 	// Main loop
 	while(1) {
+		char request[1000000];
+		int reqlen = 0;
 		// get the request
-		// do {
+		do {
 		    i_res = recv(browser_socket, data, datalen, 0);
 		    if (i_res > 0) {
 		        printf("Bytes received: %d\n", i_res);
-				printf("Request:\n\n%s", data);
+				int i;
+				for(i = 0; i < i_res; i++) request[reqlen + i] = data[i];
+				reqlen += i_res;
 		    } else if (i_res == 0) printf("Connection closing...\n");
 		    else {
-		        printf("recv failed: %d\n", WSAGetLastError());
+		        printf("request recv failed: %d\n", WSAGetLastError());
 		        closesocket(browser_socket);
 		        WSACleanup();
 		        return 1;
 		    }
-		// } while(i_res > 0);
-		printf("request received\n");
+		} while(i_res > 0);
+		printf("Request:\n%s", request);
 
 		// determine the host name
 		char host[300];
@@ -108,13 +112,7 @@ int main() {
 			host[j] = data[i+j];
 		}
 		host[j] = '\0';
-		int port = 80;
 		char port_buff[6] = "80";
-		// if(data[i+j] == ':') {
-		// 	int k;
-		// 	for(k = 0;data[i+j+k] != '\n' && k < 6; k++) port_buff[k] = data[i+j+k];
-		// 	port = atoi(port_buff);
-		// }
 
 		printf("Host: %s\n", host);
 		printf("Port: %s\n", port_buff);
@@ -147,58 +145,64 @@ int main() {
 				freeaddrinfo(result);
 				WSACleanup();
 				return 1;
-			} else printf("socket setup\n");
-			// Connect to server
-			i_res = connect(out_socket, ptr->ai_addr, (int)ptr->ai_addrlen);
-			if (i_res == SOCKET_ERROR) {
-				closesocket(out_socket);
-				out_socket = INVALID_SOCKET;
-				printf("unable to connect out socket\n");
-			} else printf("socket connected\n");
-
-			// Should really try the next address returned by getaddrinfo if the connect call failed
-			// But for this simple example we just free the resources returned by getaddrinfo and print an error message
-
-			freeaddrinfo(result);
-
-			if (out_socket == INVALID_SOCKET) {
-				printf("Unable to connect to server!\n");
-				WSACleanup();
-				return 1;
-			}
-
-			// forward the request
-			i_res = send(out_socket, data, datalen, 0);
-			if (i_res == SOCKET_ERROR) {
-				printf("Unable to forward request!\n");
-				WSACleanup();
-				return 1;
-			}
-			// get the response
-			else {
-				printf("request forwarded\n");
-				// get the request
-				i_res = recv(out_socket, data, datalen, 0);
-				if (i_res > 0) {
-					printf("Bytes received: %d\n", i_res);
-					printf("Response:\n%s\n", data);
-				} else if (i_res == 0) printf("Connection closing...\n");
-				else {
-					printf("recv failed: %d\n", WSAGetLastError());
+			} else {
+				printf("socket setup\n");
+				// Connect to server
+				i_res = connect(out_socket, ptr->ai_addr, (int)ptr->ai_addrlen);
+				if (i_res == SOCKET_ERROR) {
 					closesocket(out_socket);
+					out_socket = INVALID_SOCKET;
+					printf("unable to connect out socket\n");
+				} else printf("socket connected\n");
+
+				// Should really try the next address returned by getaddrinfo if the connect call failed
+				// But for this simple example we just free the resources returned by getaddrinfo and print an error message
+
+				freeaddrinfo(result);
+
+				if (out_socket == INVALID_SOCKET) {
+					printf("Unable to connect to server!\n");
 					WSACleanup();
 					return 1;
 				}
-				printf("response received\n");
 
+				// forward the request
+				i_res = send(out_socket, request, reqlen, 0);
+				if (i_res == SOCKET_ERROR) {
+					printf("Unable to forward request!\n");
+					WSACleanup();
+					return 1;
+				}
+				// get the response
+				else {
+					printf("request forwarded\n");
+					char response[1000000];
+					int resplen = 0;
+
+					i_res = recv(out_socket, data, datalen, 0);
+					if (i_res > 0) {
+						printf("Bytes received: %d\n", i_res);
+						int i;
+						for(i = 0; i < i_res; i++) response[resplen + i] = data[i];
+						resplen += i_res;
+					} else if (i_res == 0) printf("Connection closing...\n");
+					else {
+						printf("response recv failed: %d\n", WSAGetLastError());
+						closesocket(out_socket);
+						WSACleanup();
+						return 1;
+					}
+					printf("Response:\n%s", response);
+
+					// forward the response
+					i_res = send(browser_socket, response, resplen, 0);
+					if (i_res == SOCKET_ERROR) {
+						printf("Unable to forward response!\n");
+						WSACleanup();
+						return 1;
+					} else printf("response forwarded\n");
+				}
 			}
-			// forward the response
-			i_res = send(browser_socket, data, datalen, 0);
-			if (i_res == SOCKET_ERROR) {
-				printf("Unable to forward response!\n");
-				WSACleanup();
-				return 1;
-			} else printf("response forwarded\n");
 		}
 
 	}
