@@ -81,7 +81,6 @@ int main() {
 	// Main loop
 	while(1) {
 		char request[1000000];
-		// char request[1000000] = "GET / HTTP/1.1\r\nHost: www.example.com\r\nConnection: close\r\n\r\n";
 		int reqlen = 0;
 		// get the request
 		printf("Waiting for a request from the browser...\n");
@@ -102,19 +101,30 @@ int main() {
 		} while(i_res == datalen);
 		printf("\nRequest:\n%s", request);
 
+		if(request[0] != 'G') continue;
+
 		// determine the host name
-		char host[300];
+		char host[1000] = "";
+		char port_buff[6] = "80";
 		int i;
 		for(i = 0; i < reqlen - 5; i++) {
-			if(request[i] == 'H' && request[i+1] == 'o' && request[i+2] == 's' && request[i+3] == 't' && request[i+4] == ':') break;
+			if(request[i] == 'H' && request[i+1] == 'o' && request[i+2] == 's' && request[i+3] == 't' && request[i+4] == ':') {
+				i += 6;
+				int j;
+				for(j = 0; request[i+j] != '\r' && request[i+j] != ':' && j < 1000; j++) {
+					host[j] = request[i+j];
+				}
+				host[j] = '\0';
+				int k;
+				if(request[i+j] == ':') {
+					j += 1;
+					for(k = 0; request[i+j+k] != '\r' && k < 5; k++) {
+						port_buff[k] = request[i+j+k];
+					}
+					port_buff[5] ='\0';
+				}
+			}
 		}
-		i += 6;
-		int j;
-		for(j = 0; request[i+j] != '\r' && request[i+j] != ':' && i+j < 300; j++) {
-			host[j] = request[i+j];
-		}
-		host[j] = '\0';
-		char port_buff[6] = "80";
 
 		printf("Host: %s\n", host);
 		printf("Port: %s\n", port_buff);
