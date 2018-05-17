@@ -81,6 +81,7 @@ int main() {
 	// Main loop
 	while(1) {
 		char request[1000000];
+		// char request[1000000] = "GET / HTTP/1.1\r\nHost: www.example.com\r\nConnection: close\r\n\r\n";
 		int reqlen = 0;
 		// get the request
 		printf("Waiting for a request from the browser...\n");
@@ -105,12 +106,12 @@ int main() {
 		char host[300];
 		int i;
 		for(i = 0; i < reqlen - 5; i++) {
-			if(data[i] == 'H' && data[i+1] == 'o' && data[i+2] == 's' && data[i+3] == 't' && data[i+4] == ':') break;
+			if(request[i] == 'H' && request[i+1] == 'o' && request[i+2] == 's' && request[i+3] == 't' && request[i+4] == ':') break;
 		}
 		i += 6;
 		int j;
-		for(j = 0; data[i+j] != '\n' && data[i+j] != ':' && i+j < 300; j++) {
-			host[j] = data[i+j];
+		for(j = 0; request[i+j] != '\r' && request[i+j] != ':' && i+j < 300; j++) {
+			host[j] = request[i+j];
 		}
 		host[j] = '\0';
 		char port_buff[6] = "80";
@@ -177,8 +178,8 @@ int main() {
 				// get the response
 				else {
 					printf("request forwarded\n");
-					char response[1000000] = "HTTP/1.0 200\r\n\r\n";
-					int resplen = strlen(response);
+					char response[1000000];
+					int resplen = 0;
 
 					printf("Waiting for a response from the server...\n");
 					do {
