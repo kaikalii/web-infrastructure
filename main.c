@@ -4,7 +4,12 @@
 
 #define BROWSER_PORT "53011"
 #define OUT_PORT "53012"
-#define DEFAULT_BUFLEN 1000
+#define DEFAULT_BUFLEN 10000
+#define CACHE_MAX 1000
+
+static char* cache_requests[CACHE_MAX];
+static char* cache_responses[CACHE_MAX];
+static unsigned cache_size;
 
 int main() {
 	WSADATA wsaData;
@@ -103,10 +108,24 @@ int main() {
 
 		if(request[0] != 'G') continue;
 
+		// Check cache for request
+		int i;
+		int response_cached = -1;
+		for(i = 0; i < cache_size; i++) {
+			if(!strcmp(cache_requests[i], request)) {
+				printf("Found cached request\n");
+				response_cached = i;
+				goto send_response;
+			}
+		}
+		// Cache the request
+		if(cache_requests[cache_size]) free(cache_requests[cache_size]);
+		cache_requests[cache_size] = malloc(strlen(&request[0]));
+		strcpy(cache_requests[cache_size], &request[0]);
+
 		// determine the host name
 		char host[1000] = "";
 		char port_buff[6] = "80";
-		int i;
 		for(i = 0; i < reqlen - 5; i++) {
 			if(request[i] == 'H' && request[i+1] == 'o' && request[i+2] == 's' && request[i+3] == 't' && request[i+4] == ':') {
 				i += 6;
@@ -207,7 +226,20 @@ int main() {
 							// return 1;
 						}
 					} while(i_res == datalen);
+
+					send_response:
+					if(response_cached >= 0) {
+						strcpy(&response[0], cache_responses[response_cached]);
+					}
 					printf("\nResponse:\n%s\n", response);
+
+					// Cache the response
+					if(response_cached == -1) {
+						if(cache_responses[cache_size]) free(cache_responses[cache_size]);
+						cache_responses[cache_size] = malloc(strlen(&response[0]));
+						strcpy(cache_responses[cache_size], &response[0]);
+						cache_size++;
+					}
 
 					// forward the response
 					i_res = send(browser_socket, response, resplen, 0);
